@@ -7,6 +7,10 @@ VERIFY_TOKEN = "zimsec2026"
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/webhook")
 def verify(request: Request):
     token = request.query_params.get("hub.verify_token")
@@ -18,7 +22,7 @@ def verify(request: Request):
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    print("Received:", data) # check Render logs
+    print("Received:", data) # this will show in Logs when someone messages
     
     try:
         message = data['entry'][0]['changes'][0]['value']['messages'][0]
