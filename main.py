@@ -4,7 +4,7 @@ import db, handlers, os
 app = FastAPI(title="ZIMSEC AI Tutor")
 db.init_db()
 
-VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "zimsec123")
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "zimsec2026")
 
 @app.get("/")
 def root():
