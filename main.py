@@ -1,28 +1,44 @@
 from fastapi import FastAPI, Request
-import db, handlers, os
+import os
+import requests
 
-app = FastAPI(title="ZIMSEC AI Tutor")
-db.init_db()
-
-VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "zimsec2026")
-
-@app.get("/")
-def root():
-    return {"status": "ZIMSEC AI Tutor is running"}
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+app = FastAPI()
+VERIFY_TOKEN = "zimsec2026"
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
 @app.get("/webhook")
-async def verify_webhook(request: Request):
-    params = request.query_params
-    if params.get("hub.verify_token") == VERIFY_TOKEN:
-        return int(params.get("hub.challenge"))
-    return "Verification failed"
+def verify(request: Request):
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    if token == VERIFY_TOKEN:
+        return int(challenge)
+    return "Invalid", 403
 
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    await handlers.handle_whatsapp_message(data)
+    print("Received:", data) # check Render logs
+    
+    try:
+        message = data['entry'][0]['changes'][0]['value']['messages'][0]
+        from_number = message['from']
+        text = message['text']['body']
+        
+        # Reply back
+        reply = f"Hi! I'm Zimsec AI Tutor 👋\nYou asked: {text}\n\nI'll help you with Zimsec questions!"
+        send_message(from_number, reply)
+    except:
+        pass
+        
     return {"status": "ok"}
+
+def send_message(to, text):
+    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "text": {"body": text}
+    }
+    requests.post(url, headers=headers, json=payload)
