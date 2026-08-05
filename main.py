@@ -1,48 +1,33 @@
-from fastapi import FastAPI, Request
+from flask import Flask, request, jsonify
 import os
-import requests
+import logging
 
-app = FastAPI()
-VERIFY_TOKEN = "zimsec2026"
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+app = Flask(__name__)
+logging.basicConfig(level=logging.INFO) # add this at top
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+VERIFY_TOKEN = os.environ.get('VERIFY_TOKEN')
 
-@app.get("/webhook")
-def verify(request: Request):
-    token = request.query_params.get("hub.verify_token")
-    challenge = request.query_params.get("hub.challenge")
-    if token == VERIFY_TOKEN:
-        return int(challenge)
-    return "Invalid", 403
+@app.route('/webhook', methods=['GET', 'POST'])
+def webhook():
+    # VERIFY for Meta setup
+    if request.method == 'GET':
+        if request.args.get('hub.verify_token') == VERIFY_TOKEN:
+            logging.info("WEBHOOK VERIFIED")
+            return request.args.get('hub.challenge')
+        else:
+            logging.warning("VERIFY_TOKEN MISMATCH")
+            return 'Wrong token', 403
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    data = await request.json()
-    print("Received:", data) # this will show in Logs when someone messages
+    # RECEIVE MESSAGES
+    if request.method == 'POST':
+        logging.info("POST RECEIVED") # <--- THIS IS THE KEY LINE
+        logging.info(f"DATA: {request.get_json()}") # <--- AND THIS ONE
+        
+        # Always reply 200 to Meta or it will retry
+        return jsonify({"status": "ok"}), 200
     
-    try:
-        message = data['entry'][0]['changes'][0]['value']['messages'][0]
-        from_number = message['from']
-        text = message['text']['body']
-        
-        # Reply back
-        reply = f"Hi! I'm Zimsec AI Tutor 👋\nYou asked: {text}\n\nI'll help you with Zimsec questions!"
-        send_message(from_number, reply)
-    except:
-        pass
-        
-    return {"status": "ok"}
+    return 'Method not allowed', 405
 
-def send_message(to, text):
-    url = f"https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages"
-    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "text": {"body": text}
-    }
-    requests.post(url, headers=headers, json=payload)
+@app.route('/health')
+def health():
+    return jsonify({"status":"ok"})
