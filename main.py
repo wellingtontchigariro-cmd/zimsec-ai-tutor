@@ -1,33 +1,32 @@
-from flask import Flask, request, jsonify
-import os
-import logging
-
-app = Flask(__name__)
-logging.basicConfig(level=logging.INFO) # add this at top
-
-VERIFY_TOKEN = os.environ.get('VERIFY_TOKEN')
-
-@app.route('/webhook', methods=['GET', 'POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    # VERIFY for Meta setup
-    if request.method == 'GET':
-        if request.args.get('hub.verify_token') == VERIFY_TOKEN:
-            logging.info("WEBHOOK VERIFIED")
-            return request.args.get('hub.challenge')
-        else:
-            logging.warning("VERIFY_TOKEN MISMATCH")
-            return 'Wrong token', 403
+    data = request.get_json()
+    print("POST RECEIVED")
+    print("DATA:", data)
 
-    # RECEIVE MESSAGES
-    if request.method == 'POST':
-        logging.info("POST RECEIVED") # <--- THIS IS THE KEY LINE
-        logging.info(f"DATA: {request.get_json()}") # <--- AND THIS ONE
+    # Get the message and phone number
+    try:
+        message = data['entry'][0]['changes'][0]['value']['messages'][0]['text']['body']
+        from_number = data['entry'][0]['changes'][0]['value']['messages'][0]['from']
+        print(f"Message: {message} from {from_number}")
         
-        # Always reply 200 to Meta or it will retry
-        return jsonify({"status": "ok"}), 200
-    
-    return 'Method not allowed', 405
+        # Simple reply - "I got: Food"
+        send_whatsapp_message(from_number, f"You said: {message}. Zimsec AI Tutor is online!")
+        
+    except:
+        pass
+        
+    return 'OK', 200
 
-@app.route('/health')
-def health():
-    return jsonify({"status":"ok"})
+def send_whatsapp_message(to, text):
+    url = f"https://graph.facebook.com/v25.0/1214809328390595/messages"
+    headers = {
+        "Authorization": "Bearer EAGSoiz...", # Paste your Access Token here
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "text": {"body": text}
+    }
+    requests.post(url, headers=headers, json=payload)
