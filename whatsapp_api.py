@@ -1,14 +1,28 @@
-import requests, os
+import requests
 
-TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
-PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
-URL = f"https://graph.facebook.com/v18.0/{PHONE_ID}/messages"
+def send_message(to, text, access_token, phone_number_id):
+    # Use tokens passed from main.py, not from os.getenv here
+    if not access_token or not phone_number_id:
+        print("ERROR: Missing ACCESS_TOKEN or PHONE_NUMBER_ID")
+        return
 
-async def send_message(to, message):
-    headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+    url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
+    
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
     data = {
         "messaging_product": "whatsapp",
         "to": to,
-        "text": {"body": message}
+        "type": "text",
+        "text": {"body": text}
     }
-    requests.post(URL, headers=headers, json=data)
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        print(f"Sent to {to}: {response.status_code} - {response.text}")
+        return response.json()
+    except Exception as e:
+        print(f"Failed to send WhatsApp message: {e}")
