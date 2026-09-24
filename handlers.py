@@ -1,46 +1,72 @@
-import whatsapp_api, db, ai_logic, os
+from whatsapp_api import send_message
+import db
+import ai_logic
 
-user_sessions = {} # phone: {subject, current_q, current_a}
+# Simple memory for who is doing quiz: phone -> {answer}
+user_sessions = {}
 
-async def handle_whatsapp_message(data):
+def handle_message(data, access_token, phone_number_id):
     try:
-        entry = data['entry'][0]['changes'][0]['value']
-        if 'messages' not in entry:
+        # Check if data has WhatsApp messages
+        if "entry" not in data:
+            return
+        entry = data["entry"][0]
+        if "changes" not in entry:
+            return
+        value = entry["changes"][0].get("value", {})
+        if "messages" not in value:
             return
 
-        msg = entry['messages'][0]
-        phone = msg['from']
-        text = msg['text']['body'].lower()
+        msg = value["messages"][0]
+        phone = msg.get("from")
+        text_body = msg.get("text", {}).get("body", "")
+
+        if not phone or not text_body:
+            return
+
+        text = text_body.lower().strip()
+        print(f"From {phone}: {text}")
 
         db.add_user(phone)
 
-        if phone not in user_sessions:
-            user_sessions[phone] = {}
-
-        if text == "hi" or text == "start":
-            await whatsapp_api.send_message(phone, "Hi! I'm your ZIMSEC AI Tutor 📚\nType 'quiz math' to start a math question")
-
-        elif text.startswith("quiz "):
-            subject = text.split(" ")[1]
-            q = db.get_random_question(subject)
-            if q:
-                user_sessions[phone] = {"subject": subject, "current_q": q[2], "current_a": q[3]}
-                await whatsapp_api.send_message(phone, f"Q: {q[2]}")
-            else:
-                await whatsapp_api.send_message(phone, f"No questions for {subject} yet. Add some first!")
-
-        elif "current_q" in user_sessions[phone]:
-            user_ans = text
+        # If user is answering a quiz
+        if phone in user_sessions and "current_a" in user_sessions[phone]:
             correct_ans = user_sessions[phone]["current_a"]
-            is_correct = ai_logic.check_answer(user_ans, correct_ans)
+            is_correct = ai_logic.check_answer(text, correct_ans)
             feedback = ai_logic.get_feedback(is_correct, correct_ans)
             if is_correct:
                 db.update_score(phone, 10)
-            await whatsapp_api.send_message(phone, feedback)
-            user_sessions[phone] = {}
+                feedback += f"\nYour score: {db.get_score(phone)}"
+            send_message(phone, feedback, access_token, phone_number_id)
+            user_sessions.pop(phone, None)
+            return
+
+        # Commands
+        if text in ["hi", "hello", "hie", "start"]:
+            send_message(phone, "Hi! I'm your ZIMSEC O-Level AI Tutor 📚\n\nType *quiz math* to start Maths quiz\nOr ask me any O-Level question.", access_token, phone_number_id)
+
+        elif text.startswith("quiz"):
+            parts = text.split()
+            subject = parts[1] if len(parts) > 1 else "math"
+            q = db.get_random_question(subject)
+            if q:
+                # q = (id, subject, question, answer)
+                user_sessions[phone] = {"current_a": q[3], "current_q": q[2]}
+                send_message(phone, f"📝 QUIZ ({subject}): {q[2]}", access_token, phone_number_id)
+            else:
+                # Load samples if empty
+                ai_logic.load_sample_math()
+                q = db.get_random_question(subject)
+                if q:
+                    user_sessions[phone] = {"current_a": q[3], "current_q": q[2]}
+                    send_message(phone, f"📝 QUIZ ({subject}): {q[2]}", access_token, phone_number_id)
+                else:
+                    send_message(phone, f"No questions for {subject} yet.", access_token, phone_number_id)
 
         else:
-            await whatsapp_api.send_message(phone, "Type 'quiz math' to start")
+            # Normal tutor chat
+            reply = ai_logic.get_ai_response(text_body)
+            send_message(phone, reply, access_token, phone_number_id)
 
     except Exception as e:
-        print("Error:", e)
+        print(f"Error in handle_message: {e}")
