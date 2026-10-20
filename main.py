@@ -14,7 +14,11 @@ app = Flask(__name__)
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "zimsec123")
 ACCESS_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID")
-
+logger.info(
+    "WhatsApp configuration: token_present=%s, phone_number_id_present=%s",
+    bool(ACCESS_TOKEN),
+    bool(PHONE_NUMBER_ID),
+)
 
 # Home page: confirms that the application is running
 @app.route("/", methods=["GET"])
