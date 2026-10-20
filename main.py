@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 # Read configuration from Render environment variables
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "zimsec123")
-ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN")
+ACCESS_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID")
 
 
